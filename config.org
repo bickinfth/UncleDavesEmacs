@@ -26,8 +26,7 @@ there should be absolutely no issues.
 I highly encourage you to read up on the prose around the packages you are interested in,
 I do my absolute best to describe the configuration as well as I only can, this might help you on your emacs journey!
 Have some fun with it, add your own keybindings, change parameters, it's your editor in the end.
-
-* Dependencies for:
+*Dependencies for:
 ** EXWM
 Since we are going to use emacs as our window manager, it would be nice to have some external software to make our life easier.
 *** From the package manager:
@@ -36,7 +35,6 @@ Since we are going to use emacs as our window manager, it would be nice to have 
 - =imagemagick=, if you are going to be using emacs to take screenshots.
 - =ibus-daemon=, if you need multiple keyboard input options (emacs handles them well on its own but ibus is nice).
 - =terminus-font=, for it to work out of the box, if you don't want terminus you need to edit your =init.el=.
-
 **** Optional
 - A browser (sadly, the built in xwidgets-webkit thingie is unreliable).
 - A composite manager (highly recommended, I personally use =compton=, the built in one does not work as intended.).
@@ -283,7 +281,7 @@ The only time I actually had to use comments, this is for ease of removal if you
 
       ;; fringe size, most people prefer 1 
       (fringe-mode 3)
-      
+
       ;; emacs as a daemon, use "emacsclient <filename>" to seamlessly edit files from the terminal directly in the exwm instance
       (server-start)
 
@@ -342,6 +340,8 @@ The only time I actually had to use comments, this is for ease of removal if you
       ;; this little bit will make sure that XF86 keys work in exwm buffers as well
       (dolist (k '(XF86AudioLowerVolume
                  XF86AudioRaiseVolume
+                 XF86MonBrightnessUp
+                 XF86MonBrightnessDown
                  XF86PowerOff
                  XF86AudioMute
                  XF86AudioPlay
@@ -354,7 +354,19 @@ The only time I actually had to use comments, this is for ease of removal if you
                  Scroll_Lock
                  print))
       (cl-pushnew k exwm-input-prefix-keys))
-      
+
+      (require 'exwm-systemtray)
+      (exwm-systemtray-enable)
+
+      (require 'exwm-randr)
+      ;;(setq exwm-randr-workspace-output-plist '(0 "LVDS-1"))
+      (setq exwm-randr-workspace-monitor-plist '(0 "LVDS-1" 1 "VGA-1"))
+      (add-hook 'exwm-randr-screen-change-hook
+            (lambda ()
+              (start-process-shell-command
+               "xrandr" nil "xrandr --output LVDS-1 --left-of VGA-1 --auto")))
+      (exwm-randr-enable)
+
       ;; this just enables exwm, it started automatically once everything is ready
       (exwm-enable))
 #+END_SRC
@@ -439,6 +451,24 @@ You can also change those if you'd like, but I highly recommend keeping 'em the 
 (global-set-key (kbd "<XF86AudioRaiseVolume>") 'audio/raise-volume)
 (global-set-key (kbd "<XF86AudioLowerVolume>") 'audio/lower-volume)
 #+END_SRC
+** Monitor brightness control
+*** functions for start processes
+#+begin_src emacs-lisp
+      (defun monitor/brightness-up ()
+        (interactive)
+        (start-process "brightness-up" nil "light" "-A" "7")
+        (message "XF86MonBrightnessUp key pressed"))
+  
+      (defun monitor/brightness-down ()
+        (interactive)
+        (start-process "brightness-down" nil "light" "-U" "7")
+        (message "XF86MonBrightnessDown key pressed!"))
+#+end_src
+*** Keybindings to related processes
+#+begin_src emacs-lisp
+  (global-set-key (kbd "<XF86MonBrightnessUp>") 'monitor/brightness-up)
+  (global-set-key (kbd "<XF86MonBrightnessDown>") 'monitor/brightness-down)
+#+end_src
 
 ** Screenshots
 I don't need scrot to take screenshots, or shutter or whatever tools you might have. This is enough.
@@ -450,7 +480,7 @@ These won't work in the terminal version or the virtual console, obvious reasons
     "Takes a fullscreen screenshot of the current workspace"
     (interactive)
     (when window-system
-    (loop for i downfrom 3 to 1 do
+    (cl-loop for i downfrom 3 to 1 do
           (progn
             (message (concat (number-to-string i) "..."))
             (sit-for 1)))
@@ -482,7 +512,7 @@ I use qutebrowser, so that's what I'll set up.
         browse-url-generic-program "qutebrowser")
 #+END_SRC
 
-* Projectile
+* Projectile 
 Projectile is an awesome project manager, mostly because it recognizes directories
 with a =.git= directory as projects and helps you manage them accordingly.
 
@@ -602,19 +632,29 @@ symon can be toggled on and off with =Super + h=.
 * File manager
 Abandoning sunrise-commander.
 The repos are dead and I'm looking for something better anyway.
-
+** treemacs
+#+begin_src emacs-lisp
+  (use-package treemacs
+    :ensure t)
+#+end_src
 * The terminal
 I have used urxvt for years, and I miss it sometimes, but ansi-term is enough for most of my tasks.
-
-** Default shell should be bash
+** changing keyboard layout
+#+begin_src emacs-lisp
+  (defun change-keyboard-layout (lang)
+    (interactive "sLang (tr or us)?")
+    (shell-command (concat "setxkbmap " lang)))
+  (global-set-key (kbd "s-l") 'change-keyboard-layout)
+#+end_src
+** Default shell should be zsh
 I don't know why this is a thing, but asking me what shell to launch every single
 time I open a terminal makes me want to slap babies, this gets rid of it.
 This goes without saying but you can replace bash with your shell of choice.
 #+BEGIN_SRC emacs-lisp
-  (defvar my-term-shell "/bin/bash")
-  (defadvice ansi-term (before force-bash)
-    (interactive (list my-term-shell)))
-  (ad-activate 'ansi-term)
+      (defvar my-term-shell "/bin/zsh")
+      (defadvice ansi-term (before force-bash)
+        (interactive (list my-term-shell)))
+      (ad-activate 'ansi-term)
 #+END_SRC
 
 ** Easy to remember keybinding
@@ -685,8 +725,9 @@ this is bad, it also works less well with =exwm= for some reason.
     (setq switch-window-increase 4)
     (setq switch-window-threshold 2)
     (setq switch-window-shortcut-style 'qwerty)
-    (setq switch-window-qwerty-shortcuts
-        '("a" "s" "d" "f" "j" "k" "l" "i" "o"))
+;;    (setq switch-window-qwerty-shortcuts
+;;        '("a" "s" "d" "f" "j" "k" "l" "i" "o"))
+
   :bind
     ([remap other-window] . switch-window))
 #+END_SRC
@@ -783,6 +824,7 @@ Sometimes, you don't realize how good something is until you try it extensively.
 I give in, helm is awesome. I'll end up customizing it more eventually,
 it's rather similar to ido-vertical though.
 *** helm
+commented out
 #+BEGIN_SRC emacs-lisp
   (use-package helm
     :ensure t
@@ -814,8 +856,8 @@ it's rather similar to ido-vertical though.
           helm-echo-input-in-header-line t)
     :init
     (helm-mode 1))
-
-  (require 'helm-config)    
+  
+  (require 'helm-config)
   (helm-autoresize-mode 1)
   (define-key helm-find-files-map (kbd "C-b") 'helm-find-files-up-one-level)
   (define-key helm-find-files-map (kbd "C-f") 'helm-execute-persistent-action)
@@ -1046,7 +1088,6 @@ Minor, non-completion related settings and plugins for writing code.
           :ensure t)
         (yas-reload-all))
 #+END_SRC
-
 ** flycheck
 #+BEGIN_SRC emacs-lisp
   (use-package flycheck
@@ -1065,12 +1106,12 @@ I prefer =C-n= and =C-p= to move around the items, so I remap those accordingly.
     (setq company-idle-delay 0)
     (setq company-minimum-prefix-length 3))
 
-  (with-eval-after-load 'company
-    (define-key company-active-map (kbd "M-n") nil)
-    (define-key company-active-map (kbd "M-p") nil)
-    (define-key company-active-map (kbd "C-n") #'company-select-next)
-    (define-key company-active-map (kbd "C-p") #'company-select-previous)
-    (define-key company-active-map (kbd "SPC") #'company-abort))
+    (with-eval-after-load 'company
+      (define-key company-active-map (kbd "M-n") nil)
+      (define-key company-active-map (kbd "M-p") nil)
+      (define-key company-active-map (kbd "C-n") #'company-select-next)
+      (define-key company-active-map (kbd "C-p") #'company-select-previous)
+      (define-key company-active-map (kbd "SPC") #'company-abort))
 #+END_SRC
 
 ** specific languages
@@ -1079,7 +1120,6 @@ After messing around with =auto-completion= and =company= for a while I decided 
 AC is for Lua/LÖVE and Company for the rest.
 
 Each category also has additional settings.
-
 *** c/c++
 #+BEGIN_SRC emacs-lisp
   (add-hook 'c++-mode-hook 'yas-minor-mode)
@@ -1178,60 +1218,6 @@ Each category also has additional settings.
       (add-hook 'shell-mode-hook 'shell-mode-company-init))
 #+END_SRC
 
-*** lua/löve
-I must regrettably admit that =company= sucks with Lua/LÖVE.
-Which is also why I have =AC= now.
-I needed to do some shenanigans to get great auto-completion but here goes.
-#+BEGIN_SRC emacs-lisp
-  (add-hook 'lua-mode-hook 'yas-minor-mode)
-  (add-hook 'lua-mode-hook 'flycheck-mode)
-
-  ;;; this will download the necessary modules from git
-  (let (value)
-    (dolist (element '("love" "lua") value)
-      (unless (file-directory-p (concatenate 'string (getenv "HOME") "/.emacs.d/auto-complete-" element))
-        (shell-command (format "git clone %s %s" (concatenate 'string
-                                                              "https://github.com/rolpereira/auto-complete-" element ".el")
-                               (concatenate 'string (getenv "HOME") "/.emacs.d/auto-complete-" element) nil)))
-      (add-to-list 'load-path (expand-file-name (concatenate 'string "~/.emacs.d/auto-complete-" element)))))
-
-  (require 'auto-complete-love)
-  (require 'auto-complete-lua)
-
-  ;;; repl!
-  (add-hook 'lua-mode-hook '(lambda ()
-                              (local-set-key (kbd "C-c C-s") 'lua-show-process-buffer)
-                              (local-set-key (kbd "C-c C-h") 'lua-hide-process-buffer)))
-
-  ;;; ac > company
-  (use-package auto-complete
-    :ensure t
-    :config
-    (setq ac-use-menu-map t)
-    (setq ac-ignore-case nil)
-    (define-key ac-menu-map "\C-n" 'ac-next)
-    (define-key ac-menu-map "\C-p" 'ac-previous))
-
-  ;;; this will be changed, it's good enough for now
-  (add-hook 'lua-mode-hook '(lambda ()
-                              (setq ac-sources '(ac-source-love
-                                                 ac-source-lua
-                                                 ac-source-abbrev
-                                                 ac-source-words-in-same-mode-buffers))
-                              (auto-complete-mode)))
-
-  (add-hook 'lua-mode-hook 'auto-complete-mode)
-
-  ;;; I don't even know all the functionality
-  (use-package love-minor-mode
-    :ensure t
-    :config
-    (add-hook 'lua-mode-hook 'love-minor-mode))
-
-  ;;; behold, perfection :°)
-  (global-set-key (kbd "<f9>") '(lambda () (interactive) (start-process "love-play-game" nil "love" default-directory)))
-#+END_SRC
-
 * Git integration
 Countless are the times where I opened ansi-term to use =git= on something.
 These times are also something that I'd prefer stay in the past, since =magit= is
@@ -1252,13 +1238,15 @@ I have no need to directly edit files over SSH, but what I do need is a way to e
 Opening up nano in a terminal as root to play around with grubs default settings is a no-no, this solves that.
 
 ** Editing with sudo
-Pretty self-explanatory, useful as hell if you use exwm.
+self-explanatory
+
 #+BEGIN_SRC emacs-lisp
   (use-package sudo-edit
     :ensure t
     :bind
-      ("s-e" . sudo-edit))
+    ("s-e" . sudo-edit))
 #+END_SRC
+
 * Org
 One of the absolute greatest features of emacs is called "org-mode".
 This very file has been written in org-mode, a lot of other configurations are written in org-mode, same goes for
@@ -1309,10 +1297,10 @@ Makes it all look a bit nicer, I hate looking at asterisks.
 
 ** Easy-to-add emacs-lisp template
 Hitting tab after an "<el" in an org-mode file will create a template for elisp insertion.
-#+BEGIN_SRC emacs-lisp
-  (add-to-list 'org-structure-template-alist
-	       '("el" "#+BEGIN_SRC emacs-lisp\n?\n#+END_SRC"))
-#+END_SRC
+;;#+BEGIN_SRC emacs-lisp
+;;  (add-to-list 'org-structure-template-alist
+;;	       '("el" "#+BEGIN_SRC emacs-lisp\n?\n#+END_SRC"))
+;;#+END_SRC
 
 ** Exporting options
 One of the best things about org is the ability to export your file to many formats.
