@@ -857,7 +857,7 @@ commented out
     :init
     (helm-mode 1))
   
-  (require 'helm-config)
+;;  (require 'helm-config)
   (helm-autoresize-mode 1)
   (define-key helm-find-files-map (kbd "C-b") 'helm-find-files-up-one-level)
   (define-key helm-find-files-map (kbd "C-f") 'helm-execute-persistent-action)
