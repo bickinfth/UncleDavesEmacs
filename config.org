@@ -369,7 +369,7 @@ The only time I actually had to use comments, this is for ease of removal if you
       (add-hook 'exwm-randr-screen-change-hook
             (lambda ()
               (start-process-shell-command
-               "xrandr" nil "xrandr --output LVDS-1 --left-of VGA-1 --auto")))
+               "xrandr" nil "xrandr --output DP-3 LVDS-1 --left-of DP-1 --auto")))
       (exwm-randr-enable)
 
       ;; this just enables exwm, it started automatically once everything is ready
